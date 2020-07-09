@@ -1,0 +1,69 @@
+\import Data.Sigma
+\import HLevel
+\import Paths
+
+\data Interval
+  | L
+  | R
+  | line (i : I) \with {
+    | left => L
+    | right => R
+  }
+
+\func linep : L = R => path line
+
+\func squeeze (i : Interval) : L = i \with
+  | L      => path (\lam j => line (I.squeeze left  j))
+  | R      => path (\lam j => line (I.squeeze right j))
+  | line i => path (\lam j => line (I.squeeze i     j))
+
+\func intervalProp (i j : Interval) : i = j =>
+  inv (squeeze i) *> squeeze j
+
+-- The interval is actually contractible, but the proof doesn't need this.
+--\instance intervalContr : Contr Interval => isProp=>isContr isProp L
+
+\data Foo (i : Interval) \with
+  | L => con1
+  | R => con2
+
+\lemma fooEq (i j : Interval) : Foo i = Foo j =>
+  pmap Foo (intervalProp i j)
+
+\lemma fooLUnit : Foo L = (\Sigma) => path (iso
+    (\lam _ => ())
+    (\lam _ => con1)
+    (\lam x => \case \elim x \with { con1 => idp })
+    (\lam x => idp))
+
+\lemma fooUnit (i : Interval) : Foo i = (\Sigma) =>
+  fooEq i L *> fooLUnit
+
+\func contrFoo (i : Interval) : Contr (Foo i) =>
+transport (\lam X => Contr X) (inv (fooUnit i)) unit-isContr
+
+\lemma propFoo (i : Interval) : \Pi (f1 f2 : Foo i) -> f1 = f2 =>
+  isContr=>isProp (contrFoo i)
+
+\func foo (i : Interval) (a : Foo i) : Nat \with
+  | L, con1 => 0
+  | R, con2 => 1
+
+\lemma fooConst' (i1 i2 : Interval) (p : i1 = i2) (f1 : Foo i1) (f2 : Foo i2)
+  : foo i1 f1 = foo i2 f2 \elim p
+  | idp => pmap (foo i1) (propFoo i1 f1 f2)
+
+\lemma fooConst (i1 i2 : Interval) (f1 : Foo i1) (f2 : Foo i2)
+  : foo i1 f1 = foo i2 f2 =>
+  fooConst' i1 i2 (intervalProp i1 i2) f1 f2
+
+-- `foo L con1 = 0` and `foo R con2 = 1`, but `foo` is a constant function.
+
+\lemma bad : 0 = 1 =>
+  fooConst L R con1 con2
+
+\func allInhabitedIfBad (A : \Type) (p : 0 = 1) : A \elim p
+
+\func allInhabited (A : \Type) : A => allInhabitedIfBad A bad
+
+\lemma allTrue (A : \Prop) : A => allInhabited A
